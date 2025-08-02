@@ -1,5 +1,5 @@
 # This script is for receiving data from the Xbox controller
-# Joystick values must be scaled 0-1999 for PWM
+# Joystick values must be scaled 0-20000 for DShot
 
 # spidev will only install on Linux host, like the Pi
 import time
@@ -7,6 +7,9 @@ import struct
 import sys
 import spidev
 import pygame as p
+
+# Scale the -1 to 1 float (must fit within 2 bytes unsigned int)
+NUM_RESOLUTION = 10000
 
 p.init()
 p.joystick.init()
@@ -20,9 +23,9 @@ spi.max_speed_hz = 500_000
 spi.mode = 0
 
 # Format data for SPI transfer
-def send_spi(x, y):
+def send_spi(x, y, z):
     # Most significant byte first, with 2 signed ints
-    data = struct.pack(">hh", x, y)
+    data = struct.pack(">hhh", x, y, z)
     # Sends 4 values of bytes as a list
     spi.xfer2(list(data))
 
@@ -48,18 +51,24 @@ error_counter = 0
 
 try:
     while (controller_state):
-        # Pull events each from, so OS doesn't mark unresponsive
+        # Pull events each frame, so OS doesn't mark unresponsive
         p.event.pump()
 
         try:
-            # Horizontal signed int
-            h = int(js.get_axis(0) * 1999)
-            # Vertical signed int
-            v = int(js.get_axis(1) * 1999)
+            """
+            Extra caution to not send negative ints,
+            though ints over 20000 would be handled in STM code 
+            and will send over SPI without issue.
+            """
 
-            # Strictly ensure proper values are sent 
-            if (abs(h) <= 1999) and (abs(v) <= 1999):
-                send_spi(h, v)
+            # Side-to-side motion -- unsigned int -- left stick
+            side = int(max((js.get_axis(0) + 1) * NUM_RESOLUTION, 0))
+            # Forwad-back motion -- unsigned int -- left stick
+            front = int(max((js.get_axis(1) + 1) * NUM_RESOLUTION, 0))
+            # Vertical motion -- unsigned int -- right stick
+            vertical = int(max((js.get_axis(4) + 1) * NUM_RESOLUTION, 0))
+
+            send_spi(side, front, vertical)
 
             error_counter = 0
 
