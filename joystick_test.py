@@ -1,20 +1,25 @@
 """
 This script is for testing the script and Xbox controller
-Joystick values must be scaled 0-20,000
+Joystick values must be scaled 0-20,000 for vertical motion,
+-10,000 to 10,000 for 2D planar motion
 Left stick for 2D planar motion, right stick for elevation
 """
 
-"""
-Important note: side-to-side, forward-back, vertical will be at 10,000 when controller is at rest
-We must make sure this is accounted for in STM code before being taken at absolute value in the STM
-"""
+# Important note: Vertical will be at 10,000 when controller is at rest
+# Positive values for back and left, negative for front and right
 
 import time
 import sys
 import pygame as p
 
-# Scale the -1 to 1 float (must fit within 2 bytes unsigned int)
+# Scale the -1 to 1 float
 NUM_RESOLUTION = 10000
+# We can adjust as needed
+MIN_INPUT = 200
+
+# To ensure we send data that fits in int16
+def clamp(v, lo, hi): 
+    return lo if v < lo else hi if v > hi else v
 
 p.init()
 p.joystick.init()
@@ -46,12 +51,28 @@ try:
 
         try:
 
-            # Side-to-side motion -- unsigned int -- left stick
-            side = int(max((js.get_axis(0) + 1) * NUM_RESOLUTION, 0))
-            # Forward-back motion -- unsigned int -- left stick
-            front = int(max((js.get_axis(1) + 1) * NUM_RESOLUTION, 0))
+            # Side-to-side motion -- signed int -- left stick
+            side = int(js.get_axis(0) * NUM_RESOLUTION)
+            # Forward-back motion -- signed int -- left stick
+            front = int(js.get_axis(1) * NUM_RESOLUTION)
             # Vertical motion -- unsigned int -- right stick
-            vertical = int(max((js.get_axis(4) + 1) * NUM_RESOLUTION, 0))
+            vertical = int((js.get_axis(4) + 1) * NUM_RESOLUTION)
+
+            # -10,000 to 10,000
+            if -MIN_INPUT < side < MIN_INPUT:
+                side = 0
+
+            # -10,000 to 10,000
+            if -MIN_INPUT < front < MIN_INPUT:
+                front = 0
+
+            # 0 to 20,000
+            if vertical < (MIN_INPUT * 2):
+                vertical = 0
+
+            side = clamp(side, -10000, 10000)
+            front = clamp(front, -10000, 10000)
+            vertical = clamp(vertical, 0, 20000)
 
             print(f"Side (x): {side}, Forward (y): {front}, Vertical (z): {vertical}")
 
@@ -72,6 +93,5 @@ except KeyboardInterrupt:
     print("Program ended by user")
 
 finally:
-    spi.close()
-    p.close()
+    p.quit()
     sys.exit(0)

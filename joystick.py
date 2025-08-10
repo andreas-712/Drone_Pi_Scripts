@@ -1,8 +1,13 @@
 """
 This script is for receiving data from the Xbox controller
-Joystick values must be scaled 0-20000 for DShot
+Joystick values must be scaled 0-20,000 for vertical motion,
+-10,000 to 10,000 for 2D planar motion
 Left stick for 2D planar motion, right stick for elevation
 """
+
+# Important note: Vertical will be at 10,000 when controller is at rest
+# Positive values for back and left, negative for front and right
+
 
 import time
 import struct
@@ -10,8 +15,13 @@ import sys
 import spidev # spidev will only install on Linux host, like the Pi
 import pygame as p
 
-# Scale the -1 to 1 float (must fit within 2 bytes unsigned int)
+# Scale the -1 to 1 float
 NUM_RESOLUTION = 10000
+MIN_INPUT = 200
+
+# To ensure we send data that fits in int16
+def clamp(v, lo, hi): 
+    return lo if v < lo else hi if v > hi else v
 
 p.init()
 p.joystick.init()
@@ -57,18 +67,28 @@ try:
         p.event.pump()
 
         try:
-            """
-            Extra caution to not send negative ints,
-            though ints over the limit would be handled in STM code 
-            and will send over SPI without issue.
-            """
-
-            # Side-to-side motion -- unsigned int -- left stick
-            side = int(max((js.get_axis(0) + 1) * NUM_RESOLUTION, 0))
-            # Forward-back motion -- unsigned int -- left stick
-            front = int(max((js.get_axis(1) + 1) * NUM_RESOLUTION, 0))
+            # Side-to-side motion -- signed int -- left stick
+            side = int(js.get_axis(0) * NUM_RESOLUTION)
+            # Forward-back motion -- signed int -- left stick
+            front = int(js.get_axis(1) * NUM_RESOLUTION)
             # Vertical motion -- unsigned int -- right stick
-            vertical = int(max((js.get_axis(4) + 1) * NUM_RESOLUTION, 0))
+            vertical = int((js.get_axis(4) + 1) * NUM_RESOLUTION)
+
+            # -10,000 to 10,000
+            if -MIN_INPUT < side < MIN_INPUT:
+                side = 0
+
+            # -10,000 to 10,000
+            if -MIN_INPUT < front < MIN_INPUT:
+                front = 0
+
+            # 0 to 20,000
+            if vertical < (MIN_INPUT * 2):
+                vertical = 0
+
+            side = clamp(side, -10000, 10000)
+            front = clamp(front, -10000, 10000)
+            vertical = clamp(vertical, 0, 20000)
 
             send_spi(side, front, vertical)
 
@@ -90,5 +110,5 @@ except KeyboardInterrupt:
 
 finally:
     spi.close()
-    p.close()
+    p.quit()
     sys.exit(0)
