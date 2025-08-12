@@ -83,8 +83,8 @@ try:
                 front = 0
 
             # 0 to 20,000
-            if vertical < (MIN_INPUT * 2):
-                vertical = 0
+            if (10000 - MIN_INPUT) < vertical < (10000 + MIN_INPUT):
+                vertical = 10000
 
             side = clamp(side, -10000, 10000)
             front = clamp(front, -10000, 10000)
