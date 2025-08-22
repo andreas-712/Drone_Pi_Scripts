@@ -1,6 +1,6 @@
 """
 This script is for receiving data from the Xbox controller
-Joystick values must be scaled 0-20,000 for vertical motion,
+Joystick values must be scaled 0-20,000 for vertical motion (down is higher),
 -10,000 to 10,000 for 2D planar motion
 Left stick for 2D planar motion, right stick for elevation
 """
@@ -17,7 +17,7 @@ import pygame as p
 
 # Scale the -1 to 1 float
 NUM_RESOLUTION = 10000
-MIN_INPUT = 200
+MIN_INPUT = 500
 
 # To ensure we send data that fits in int16
 def clamp(v, lo, hi): 
@@ -72,7 +72,7 @@ try:
             # Forward-back motion -- signed int -- left stick
             front = int(js.get_axis(1) * NUM_RESOLUTION)
             # Vertical motion -- unsigned int -- right stick
-            vertical = int((js.get_axis(4) + 1) * NUM_RESOLUTION)
+            vertical = int((js.get_axis(3) + 1) * NUM_RESOLUTION)
 
             # -10,000 to 10,000
             if -MIN_INPUT < side < MIN_INPUT:
