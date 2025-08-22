@@ -1,6 +1,6 @@
 """
 This script is for receiving data from the Xbox controller
-Joystick values must be scaled 0-20,000 for vertical motion (down is higher),
+Joystick values must be scaled 0-20,000 for vertical motion,
 -10,000 to 10,000 for 2D planar motion
 Left stick for 2D planar motion, right stick for elevation
 """
@@ -72,7 +72,7 @@ try:
             # Forward-back motion -- signed int -- left stick
             front = int(js.get_axis(1) * NUM_RESOLUTION)
             # Vertical motion -- unsigned int -- right stick
-            vertical = int((js.get_axis(3) + 1) * NUM_RESOLUTION)
+            vertical = int((1 - js.get_axis(3)) * NUM_RESOLUTION)
 
             # -10,000 to 10,000
             if -MIN_INPUT < side < MIN_INPUT:
