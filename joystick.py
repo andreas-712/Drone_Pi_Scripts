@@ -15,11 +15,23 @@ import sys
 import spidev # spidev will only install on Linux host, like the Pi
 import pygame as p
 
-# Scale the -1 to 1 float
+# Scaling and clamping
 NUM_RESOLUTION = 10000
 MIN_INPUT = 500
+MAX_HORIZONTAL_INPUT = 10000
+MAX_VERTICAL_INPUT = 20000
+DISARM_VALUE = -30000
+ARM_VALUE = 30000
+# Joysticks
+LATERAL_AXIS = 0
+LONGITUDE_AXIS = 1
+VERTICAL_AXIS = 3
+# Buttons
+DISARM_BUTTON = 0
+ARM_BUTTON = 1
 
-# To ensure we send data that fits in int16
+
+# Fits data inside int16
 def clamp(v, lo, hi): 
     return lo if v < lo else hi if v > hi else v
 
@@ -40,6 +52,9 @@ def send_spi(x, y, z):
     data = struct.pack(">hhh", x, y, z)
     # Sends 4 values of bytes as a list
     spi.xfer2(list(data))
+
+def send_command(value):
+    send_spi(value, value, value)
 
 # If no controls are active
 if p.joystick.get_count() == 0:
@@ -68,29 +83,38 @@ try:
 
         try:
             # Side-to-side motion -- signed int -- left stick
-            side = int(js.get_axis(0) * NUM_RESOLUTION)
+            side = int(js.get_axis(LATERAL_AXIS) * NUM_RESOLUTION)
             # Forward-back motion -- signed int -- left stick
-            front = int(js.get_axis(1) * NUM_RESOLUTION)
-            # Vertical motion -- unsigned int -- right stick
-            vertical = int((1 - js.get_axis(3)) * NUM_RESOLUTION)
+            front = int(js.get_axis(LONGITUDE_AXIS) * NUM_RESOLUTION)
+            # Vertical motion -- signed int -- right stick
+            vertical = int((1 - js.get_axis(VERTICAL_AXIS)) * NUM_RESOLUTION)
+            # Disarm button (A)
+            disarm = js.get_button(DISARM_BUTTON)
+            # Arm button (B)
+            arm = js.get_button(ARM_BUTTON)
 
-            # -10,000 to 10,000
-            if -MIN_INPUT < side < MIN_INPUT:
-                side = 0
+            if disarm:
+                send_command(DISARM_VALUE)
+            elif arm:
+                send_command(ARM_VALUE)
+            else:
+                # Clamp stick drift around center
+                if -MIN_INPUT < side < MIN_INPUT:
+                    side = 0
 
-            # -10,000 to 10,000
-            if -MIN_INPUT < front < MIN_INPUT:
-                front = 0
+                # Clamp stick drift around center
+                if -MIN_INPUT < front < MIN_INPUT:
+                    front = 0
 
-            # 0 to 20,000
-            if (10000 - MIN_INPUT) < vertical < (10000 + MIN_INPUT):
-                vertical = 10000
+                # Clamp stick drift around hover/rest value
+                if (NUM_RESOLUTION - MIN_INPUT) < vertical < (NUM_RESOLUTION + MIN_INPUT):
+                    vertical = NUM_RESOLUTION
 
-            side = clamp(side, -10000, 10000)
-            front = clamp(front, -10000, 10000)
-            vertical = clamp(vertical, 0, 20000)
+                side = clamp(side, -MAX_HORIZONTAL_INPUT, MAX_HORIZONTAL_INPUT)
+                front = clamp(front, -MAX_HORIZONTAL_INPUT, MAX_HORIZONTAL_INPUT)
+                vertical = clamp(vertical, 0, MAX_VERTICAL_INPUT)
 
-            send_spi(side, front, vertical)
+                send_spi(side, front, vertical)
 
             error_counter = 0
 
